@@ -353,7 +353,7 @@ load_icode(struct Env* e, uint8_t* binary) {
 
     lcr3(PADDR(e->env_pgdir));
 
-    cprintf("%x\n", e->env_pgdir);
+    cprintf("page alloc for env begin\n");
     for (int i = 0; i < ph_num; i++) {
         if (ph[i].p_type == ELF_PROG_LOAD) {
             region_alloc(e, (void*)ph[i].p_va, ph[i].p_memsz);
@@ -361,15 +361,17 @@ load_icode(struct Env* e, uint8_t* binary) {
             memcpy((void*)ph[i].p_va, binary + ph[i].p_offset, ph[i].p_filesz);
         }
     }
-
-    lcr3(PADDR(kern_pgdir));
-
-    e->env_tf.tf_eip = ELFHDR->e_entry;
     // Now map one page for the program's initial stack
     // at virtual address USTACKTOP - PGSIZE.
 
     // LAB 3: Your code here.
     region_alloc(e, (void*)(USTACKTOP - PGSIZE), PGSIZE);
+
+    cprintf("page alloc for env complete\n");
+
+    lcr3(PADDR(kern_pgdir));
+
+    e->env_tf.tf_eip = ELFHDR->e_entry;
 }
 
 //
@@ -386,9 +388,7 @@ void env_create(uint8_t* binary, enum EnvType type) {
     if ((r = env_alloc(&e, 0) != 0)) {
         panic("create env failed\n");
     }
-    cprintf("tag1\n");
     load_icode(e, binary);
-    cprintf("tag2\n");
     e->env_type = type;
 }
 
@@ -460,6 +460,7 @@ void env_destroy(struct Env* e) {
 
     if (curenv == e) {
         curenv = NULL;
+        cprintf("\ncall sched_yield in env_destroy\n");
         sched_yield();
     }
 }
@@ -517,7 +518,7 @@ void env_run(struct Env* e) {
     curenv = e;
     e->env_status = ENV_RUNNING;
     e->env_runs++;
-    cprintf("%x\n", e->env_pgdir);
+    unlock_kernel();
     lcr3(PADDR(e->env_pgdir));
     env_pop_tf(&e->env_tf);
 }

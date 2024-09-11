@@ -29,14 +29,27 @@ void i386_init(void) {
     // Can't call cprintf until after we do this!
     cons_init();
 
-    cprintf("6828 decimal is %o octal!\n\n", 6828);
+    cprintf("6828 decimal is %o octal!\n", 6828);
 
     // Lab 2 memory management initialization functions
-    cprintf("boot cpu mem init begin!\n");
+    cprintf("\nboot cpu mem init begin!\n");
     mem_init();
     cprintf("boot cpu mem init complete!\n");
+
+    // Lab 3 user environment initialization functions
+    cprintf("\nboot cpu env init begin!\n");
+    env_init();
+    cprintf("boot cpu env inits complete!\n");
+
+    cprintf("\nboot cpu trap init begin!\n");
+    trap_init();
+    cprintf("boot cpu trap init complete!\n");
+
     // Lab 4 multiprocessor initialization functions
+    cprintf("\nmp init begin!\n");
     mp_init();
+    cprintf("mp init complete!\n");
+
     lapic_init();
 
     // Lab 4 multitasking initialization functions
@@ -44,19 +57,26 @@ void i386_init(void) {
 
     // Acquire the big kernel lock before waking up APs
     // Your code here:
-
+    lock_kernel();
     // Starting non-boot CPUs
+    cprintf("\nboot_aps begin!\n");
     boot_aps();
+    cprintf("boot_aps complete!\n");
 
 #if defined(TEST)
     // Don't touch -- used by grading script!
     ENV_CREATE(TEST, ENV_TYPE_USER);
 #else
     // Touch all you want.
-    ENV_CREATE(user_primes, ENV_TYPE_USER);
+    cprintf("\nboot cpu begin create envs!\n");
+    ENV_CREATE(user_yield, ENV_TYPE_USER);
+    ENV_CREATE(user_yield, ENV_TYPE_USER);
+    ENV_CREATE(user_yield, ENV_TYPE_USER);
+    cprintf("boot cpu create envs complete!\n\n");
 #endif  // TEST*
 
     // Schedule and run the first user environment!
+    cprintf("\ncall sched_yield in i386_init\n");
     sched_yield();
 }
 
@@ -107,10 +127,9 @@ void mp_main(void) {
     // only one CPU can enter the scheduler at a time!
     //
     // Your code here:
-
-    // Remove this after you finish Exercise 6
-    for (;;)
-        ;
+    lock_kernel();
+    cprintf("\ncall sched_yield in mp_main\n");
+    sched_yield();
 }
 
 /*

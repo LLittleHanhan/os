@@ -204,7 +204,19 @@ static void
 trap_dispatch(struct Trapframe* tf) {
     // Handle processor exceptions.
     // LAB 3: Your code here.
-
+    if (tf->tf_trapno == T_PGFLT) {
+        page_fault_handler(tf);
+        return;
+    }
+    if (tf->tf_trapno == T_BRKPT) {
+        monitor(tf);
+        return;
+    }
+    if (tf->tf_trapno == T_SYSCALL) {
+        tf->tf_regs.reg_eax = syscall(tf->tf_regs.reg_eax, tf->tf_regs.reg_edx, tf->tf_regs.reg_ecx,
+                                      tf->tf_regs.reg_ebx, tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
+        return;
+    }
     // Handle spurious interrupts
     // The hardware sometimes raises these because of noise on the
     // IRQ line or other reasons. We don't care.
@@ -217,9 +229,13 @@ trap_dispatch(struct Trapframe* tf) {
     // Handle clock interrupts. Don't forget to acknowledge the
     // interrupt using lapic_eoi() before calling the scheduler!
     // LAB 4: Your code here.
-
+    if (tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER) {
+        lapic_eoi();
+        sched_yield();
+        return;
+    }
     // Unexpected trap: The user process or the kernel has a bug.
-    print_trapframe(tf);
+    // print_trapframe(tf);
     if (tf->tf_cs == GD_KT)
         panic("unhandled trap in kernel");
     else {
@@ -252,12 +268,14 @@ void trap(struct Trapframe* tf) {
         // Acquire the big kernel lock before doing any
         // serious kernel work.
         // LAB 4: Your code here.
+        lock_kernel();
         assert(curenv);
 
         // Garbage collect if current enviroment is a zombie
         if (curenv->env_status == ENV_DYING) {
             env_free(curenv);
             curenv = NULL;
+            cprintf("\ncall sched_yield in trap when env status is dying\n");
             sched_yield();
         }
 
@@ -281,8 +299,10 @@ void trap(struct Trapframe* tf) {
     // if doing so makes sense.
     if (curenv && curenv->env_status == ENV_RUNNING)
         env_run(curenv);
-    else
+    else {
+        cprintf("\ncall sched_yield in trap after handle interrupt\n");
         sched_yield();
+    }
 }
 
 void page_fault_handler(struct Trapframe* tf) {
@@ -329,7 +349,25 @@ void page_fault_handler(struct Trapframe* tf) {
     //   (the 'tf' variable points at 'curenv->env_tf').
 
     // LAB 4: Your code here.
+    if (curenv->env_pgfault_upcall) {
+        uintptr_t stacktop = UXSTACKTOP;
+        if (UXSTACKTOP - PGSIZE < tf->tf_esp && tf->tf_esp < UXSTACKTOP) {
+            stacktop = tf->tf_esp;
+        }
+        uint32_t size = sizeof(struct UTrapframe) + sizeof(uint32_t);
+        user_mem_assert(curenv, (void*)stacktop - size, size, PTE_U | PTE_W);
+        struct UTrapframe* utr = (struct UTrapframe*)(stacktop - size);
+        utr->utf_fault_va = fault_va;
+        utr->utf_err = tf->tf_err;
+        utr->utf_regs = tf->tf_regs;
+        utr->utf_eip = tf->tf_eip;
+        utr->utf_eflags = tf->tf_eflags;
+        utr->utf_esp = tf->tf_esp;  // UXSTACKTOP栈上需要保存发生缺页异常时的%esp和%eip
 
+        curenv->env_tf.tf_eip = (uintptr_t)curenv->env_pgfault_upcall;
+        curenv->env_tf.tf_esp = (uintptr_t)utr;
+        env_run(curenv);
+    }
     // Destroy the environment that caused the fault.
     cprintf("[%08x] user fault va %08x ip %08x\n",
             curenv->env_id, fault_va, tf->tf_eip);

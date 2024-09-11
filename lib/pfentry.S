@@ -80,3 +80,13 @@ _pgfault_upcall:
 
 	// Return to re-execute the instruction that faulted.
 	// LAB 4: Your code here.
+	addl $8, %esp			//跳过utf_fault_va和utf_err
+	movl 40(%esp), %eax 	//保存中断发生时的esp到eax
+	movl 32(%esp), %ecx 	//保存终端发生时的eip到ecx
+	movl %ecx, -4(%eax) 	//将中断发生时的esp值亚入到到原来的栈中
+	popal
+	addl $4, %esp			//跳过eip
+	popfl
+	popl %esp
+	lea -4(%esp), %esp
+	ret

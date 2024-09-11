@@ -343,7 +343,7 @@ struct PageInfo* page_alloc(int alloc_flags) {
         cprintf("page_alloc: out of free memory\n");
         return NULL;
     }
-    cprintf("page_alloc num(phys page) %d\n", ret - pages);
+    // cprintf("page_alloc num(phys page) %d\n", ret - pages);
     page_free_list = ret->pp_link;
     ret->pp_link = NULL;
     if (alloc_flags & ALLOC_ZERO) {
@@ -364,7 +364,7 @@ void page_free(struct PageInfo* pp) {
         panic("can't properly free page\n");
     pp->pp_link = page_free_list;
     page_free_list = pp;
-    cprintf("page_free num(phys page) %d\n", pp - pages);
+    // cprintf("page_free num(phys page) %d\n", pp - pages);
 }
 
 //
@@ -612,7 +612,7 @@ static uintptr_t user_mem_check_addr;
 //
 int user_mem_check(struct Env* env, const void* va, size_t len, int perm) {
     // LAB 3: Your code here.
-    cprintf("user_mem_check va: %x, len: %x\n", va, len);
+    // cprintf("user_mem_check va: %x, len: %x\n", va, len);
     uint32_t begin = (uint32_t)ROUNDDOWN(va, PGSIZE);
     uint32_t end = (uint32_t)ROUNDUP(va + len, PGSIZE);
     uint32_t i;
@@ -623,7 +623,7 @@ int user_mem_check(struct Env* env, const void* va, size_t len, int perm) {
             return -E_FAULT;
         }
     }
-    cprintf("user_mem_check success va: %x, len: %x\n", va, len);
+    // cprintf("user_mem_check success va: %x, len: %x\n", va, len);
     return 0;
 }
 
@@ -814,11 +814,6 @@ check_kern_pgdir(void) {
     // check phys mem
     for (i = 0; i < npages * PGSIZE; i += PGSIZE)
         assert(check_va2pa(pgdir, KERNBASE + i) == i);
-
-    // check kernel stack
-    for (i = 0; i < KSTKSIZE; i += PGSIZE)
-        assert(check_va2pa(pgdir, KSTACKTOP - KSTKSIZE + i) == PADDR(bootstack) + i);
-    assert(check_va2pa(pgdir, KSTACKTOP - PTSIZE) == ~0);
 
     // check kernel stack
     // (updated in lab 4 to check per-CPU kernel stacks)

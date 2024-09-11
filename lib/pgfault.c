@@ -6,12 +6,11 @@
 
 #include <inc/lib.h>
 
-
 // Assembly language pgfault entrypoint defined in lib/pfentry.S.
 extern void _pgfault_upcall(void);
 
 // Pointer to currently installed C-language pgfault handler.
-void (*_pgfault_handler)(struct UTrapframe *utf);
+void (*_pgfault_handler)(struct UTrapframe* utf);
 
 //
 // Set the page fault handler function.
@@ -21,17 +20,19 @@ void (*_pgfault_handler)(struct UTrapframe *utf);
 // at UXSTACKTOP), and tell the kernel to call the assembly-language
 // _pgfault_upcall routine when a page fault occurs.
 //
-void
-set_pgfault_handler(void (*handler)(struct UTrapframe *utf))
-{
-	int r;
+void set_pgfault_handler(void (*handler)(struct UTrapframe* utf)) {
+    int r;
 
-	if (_pgfault_handler == 0) {
-		// First time through!
-		// LAB 4: Your code here.
-		panic("set_pgfault_handler not implemented");
-	}
+    if (_pgfault_handler == 0) {
+        // First time through!
+        // LAB 4: Your code here.
+        int r = sys_page_alloc(0, (void*)(UXSTACKTOP - PGSIZE), PTE_W | PTE_U | PTE_P);  // 为当前进程分配异常栈
+        if (r < 0) {
+            panic("set_pgfault_handler:sys_page_alloc failed");
+        }
+        sys_env_set_pgfault_upcall(0, _pgfault_upcall);  // 系统调用，设置进程的env_pgfault_upcall属性
+    }
 
-	// Save handler pointer for assembly to call.
-	_pgfault_handler = handler;
+    // Save handler pointer for assembly to call.
+    _pgfault_handler = handler;
 }
